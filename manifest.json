@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "沉浸式翻译（克隆版）",
+  "version": "0.1.0",
+  "description": "一个用于学习目的的沉浸式翻译插件克隆。",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage"
+  ],
+  "host_permissions": [
+    "https://api.mymemory.translated.net/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"]
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html"
+  }
+} 
