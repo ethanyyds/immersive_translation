@@ -25,10 +25,9 @@ function insertTranslation(originalElement, translatedText) {
 }
 
 /**
- * 遍历并翻译页面中的段落。
+ * 批量翻译页面中的段落。
  */
 function translatePage() {
-  // 仅选择尚未被标记为已翻译的 <p> 元素
   const paragraphs = document.querySelectorAll('p:not([data-translated="true"])');
   console.log(`找到了 ${paragraphs.length} 个新的段落进行翻译。`);
 
@@ -37,43 +36,73 @@ function translatePage() {
     return;
   }
 
+  // 收集所有需要翻译的文本
+  const textsToTranslate = [];
+  const elementsToTranslate = [];
+  
   paragraphs.forEach(p => {
     const originalText = p.innerText;
-
-    // 确保段落有实际文本内容
     if (originalText.trim().length > 0) {
-      // 1. 先标记，防止重复发送请求
+      textsToTranslate.push(originalText);
+      elementsToTranslate.push(p);
+      // 先标记，防止重复翻译
       p.dataset.translated = "true";
-
-      // 2. 发送消息到 background.js 请求翻译
-      chrome.runtime.sendMessage(
-        { action: "translate_text", text: originalText },
-        (response) => {
-          if (chrome.runtime.lastError) {
-            console.error("翻译请求失败:", chrome.runtime.lastError.message);
-            // 可选：如果失败，可以把标记移除，允许重试
-            // delete p.dataset.translated;
-            return;
-          }
-          
-          if (response.error) {
-            console.error("翻译API错误:", response.error);
-          } else if (response.translatedText) {
-            // 3. 收到翻译结果后，插入到页面
-            insertTranslation(p, response.translatedText);
-          }
-        }
-      );
     }
   });
+
+  if (textsToTranslate.length === 0) {
+    console.log("没有有效的文本需要翻译。");
+    return;
+  }
+
+  console.log(`准备批量翻译 ${textsToTranslate.length} 个文本段落`);
+
+  // 发送批量翻译请求到 background.js
+  chrome.runtime.sendMessage(
+    { 
+      action: "translate_batch", 
+      texts: textsToTranslate 
+    },
+    (response) => {
+      if (chrome.runtime.lastError) {
+        console.error("批量翻译请求失败:", chrome.runtime.lastError.message);
+        // 如果失败，移除标记，允许重试
+        elementsToTranslate.forEach(p => {
+          delete p.dataset.translated;
+        });
+        return;
+      }
+      
+      if (response.error) {
+        console.error("批量翻译API错误:", response.error);
+        // 如果失败，移除标记，允许重试
+        elementsToTranslate.forEach(p => {
+          delete p.dataset.translated;
+        });
+      } else if (response.translatedTexts && Array.isArray(response.translatedTexts)) {
+        console.log(`收到 ${response.translatedTexts.length} 个翻译结果`);
+        
+        // 将翻译结果插入到对应的段落
+        response.translatedTexts.forEach((translatedText, index) => {
+          if (index < elementsToTranslate.length) {
+            insertTranslation(elementsToTranslate[index], translatedText);
+          }
+        });
+        
+        console.log("批量翻译完成！");
+      } else {
+        console.error("批量翻译响应格式错误:", response);
+      }
+    }
+  );
 }
 
-// 监听来自 popup 或其他地方的消息
+// 监听来自 popup 的指令
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  console.log("接收到消息:", request);
+  console.log("接收到指令:", request);
   if (request.action === "translate_page") {
     translatePage();
-    sendResponse({ status: "翻译任务已启动" });
+    sendResponse({ status: "批量翻译任务已启动" });
   }
-  return true; // 保持消息通道开放，用于异步响应
+  return true;
 }); 
