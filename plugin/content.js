@@ -9,8 +9,10 @@ console.log("内容脚本已注入，等待指令。");
 function insertTranslation(originalElement, translatedText) {
   if (!translatedText) return;
 
-  // 创建一个新的 <p> 元素来显示译文
-  const translationElement = document.createElement('p');
+  const isListItem = originalElement.tagName.toLowerCase() === 'li';
+
+  // 对于列表项，使用 <div> 包裹译文并放在 <li> 内部，避免破坏列表结构
+  const translationElement = document.createElement(isListItem ? 'div' : 'p');
   translationElement.innerText = translatedText;
 
   // 给译文添加一些样式
@@ -20,8 +22,13 @@ function insertTranslation(originalElement, translatedText) {
   originalElement.style.marginBottom = '0.2em';
   translationElement.style.marginTop = '0em';
 
-  // 将译文元素插入到原始段落的下方
-  originalElement.insertAdjacentElement('afterend', translationElement);
+  if (isListItem) {
+    // 插入到 <li> 内部
+    originalElement.appendChild(translationElement);
+  } else {
+    // 将译文元素插入到原始元素下方
+    originalElement.insertAdjacentElement('afterend', translationElement);
+  }
 }
 
 /**
